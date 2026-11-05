@@ -1,0 +1,9 @@
+/data/
+/runs/
+/roberta_base/
+/vit_base_patch16_224_in21k.pth
+/.venv/
+__pycache__/
+*.pyc
+/log/
+/plot/
