@@ -51,6 +51,7 @@ parser.add_argument('--lambda_z', default=0.3, type=float, help='reg for z')
 parser.add_argument('--z_lr', default=1e-3, type=float, help='learning rate for z')
 parser.add_argument('--alpha_lr', default=0.5, type=float, help='learning rate for alpha')
 
+parser.set_defaults(alpha=0.9, lr_decay=2.0, lora=1, extname='RoBERTa_SST2', print=1)
 args = parser.parse_args()
 print(args.lora)
 gpu_idx = args.gpu

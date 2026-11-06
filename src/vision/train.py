@@ -300,7 +300,18 @@ def build_parser():
     parser.add_argument("--lora", type=int, default=0)
     parser.add_argument("--save_best", dest="save_best", action="store_true")
     parser.add_argument("--no_save_best", dest="save_best", action="store_false")
-    parser.set_defaults(save_best=True)
+    parser.set_defaults(
+        protocol="original_draw3",
+        alpha_scope="global",
+        cone_scope="global",
+        regularizer_solver="closed_form",
+        restricted_impl="fast",
+        search_diagnostics="minimal",
+        deterministic_test=True,
+        history_profile="off",
+        project_z_box=True,
+        save_best=True,
+    )
     return parser
 
 
