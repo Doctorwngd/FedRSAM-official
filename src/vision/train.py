@@ -205,21 +205,6 @@ def build_parser():
     )
     parser.add_argument("--alpha_init", type=float, default=0.1)
     parser.add_argument(
-        "--server_momentum",
-        type=float,
-        default=0.85,
-        help="FedRSAM server aggregation momentum; part of the method.",
-    )
-    parser.add_argument(
-        "--normalized_server_momentum",
-        action="store_true",
-        help=(
-            "Use the scale-preserving server EMA: beta * velocity + "
-            "(1 - beta) * aggregate_delta. The default retains the "
-            "historical unnormalized update for exact reproducibility."
-        ),
-    )
-    parser.add_argument(
         "--client_lookahead_gamma",
         "--gamma",
         dest="client_lookahead_gamma",
@@ -311,11 +296,15 @@ def build_parser():
         history_profile="off",
         project_z_box=True,
         save_best=True,
+        server_momentum=0.85,
+        normalized_server_momentum=False,
     )
     return parser
 
 
 def apply_protocol_defaults(args):
+    if args.alg == "NSAMFed":
+        args.alg = "FedRSAM"
     if args.lr_schedule is None:
         args.lr_schedule = (
             "cosine"

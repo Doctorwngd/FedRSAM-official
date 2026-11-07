@@ -57,16 +57,16 @@ PY
 
 ## Vision training
 
-Set `--gpu` to your CUDA device index. The runners use the closed-form method. The commands save outputs under `runs/`.
+Set `--gpu` to your CUDA device index. The runners use the closed-form method and fixed server momentum 0.85. The commands save outputs under `runs/`.
 
 ### CIFAR-10 / LeNet-5
 
 ```bash
 python src/vision/train.py \
-  --alg NSAMFed --data_name CIFAR10 --CNN lenet5 --epoch 301 --seed 3407 \
+  --alg FedRSAM --data_name CIFAR10 --CNN lenet5 --epoch 301 --seed 3407 \
   --lr 1e-1 --E 5 --K 50 --batch_size 50 --normalization GN \
   --num_workers 100 --selection 0.1 --alpha_value 0.1 --gpu 0 --num_gpus_per 0.1 \
-  --server_momentum 0.85 --rho 0.1 --lambda_z 1e-3 --z_lr 1e-3 --alpha_lr 0.5 \
+  --rho 0.1 --lambda_z 1e-3 --z_lr 1e-3 --alpha_lr 0.5 \
   --extname cifar10-lenet5 --output_dir runs/cifar10-lenet5
 ```
 
@@ -74,10 +74,10 @@ python src/vision/train.py \
 
 ```bash
 python src/vision/train.py \
-  --alg NSAMFed --data_name CIFAR10 --CNN resnet18 --epoch 301 --seed 3407 \
+  --alg FedRSAM --data_name CIFAR10 --CNN resnet18 --epoch 301 --seed 3407 \
   --lr 1e-1 --E 5 --K 50 --batch_size 50 --normalization GN \
   --num_workers 100 --selection 0.1 --alpha_value 0.1 --gpu 0 --num_gpus_per 0.1 \
-  --server_momentum 0.85 --rho 0.1 --lambda_z 3e-4 --z_lr 1e-3 --alpha_lr 0.5 \
+  --rho 0.1 --lambda_z 3e-4 --z_lr 1e-3 --alpha_lr 0.5 \
   --extname cifar10-resnet18 --output_dir runs/cifar10-resnet18
 ```
 
@@ -85,10 +85,10 @@ python src/vision/train.py \
 
 ```bash
 python src/vision/train.py \
-  --alg NSAMFed --data_name CIFAR100 --CNN lenet5 --epoch 301 --seed 3407 \
+  --alg FedRSAM --data_name CIFAR100 --CNN lenet5 --epoch 301 --seed 3407 \
   --lr 1e-1 --E 5 --K 50 --batch_size 50 --normalization GN \
   --num_workers 100 --selection 0.1 --alpha_value 0.1 --gpu 0 --num_gpus_per 0.1 \
-  --server_momentum 0.85 --rho 0.1 --lambda_z 1e-3 --z_lr 1e-3 --alpha_lr 0.5 \
+  --rho 0.1 --lambda_z 1e-3 --z_lr 1e-3 --alpha_lr 0.5 \
   --extname cifar100-lenet5 --output_dir runs/cifar100-lenet5
 ```
 
@@ -96,10 +96,10 @@ python src/vision/train.py \
 
 ```bash
 python src/vision/train.py \
-  --alg NSAMFed --data_name CIFAR100 --CNN resnet18 --epoch 301 --seed 3407 \
+  --alg FedRSAM --data_name CIFAR100 --CNN resnet18 --epoch 301 --seed 3407 \
   --lr 1e-1 --E 5 --K 50 --batch_size 50 --normalization GN \
   --num_workers 100 --selection 0.1 --alpha_value 0.1 --gpu 0 --num_gpus_per 0.1 \
-  --server_momentum 0.85 --rho 0.1 --lambda_z 1e-3 --z_lr 1e-3 --alpha_lr 0.5 \
+  --rho 0.1 --lambda_z 1e-3 --z_lr 1e-3 --alpha_lr 0.5 \
   --extname cifar100-resnet18 --output_dir runs/cifar100-resnet18
 ```
 
@@ -107,21 +107,21 @@ python src/vision/train.py \
 
 ```bash
 python src/tiny/runner.py \
-  --alg FedRSAM_CF --rounds 101 --seed 3407 --gpu 0 \
+  --alg FedRSAM --rounds 101 --seed 3407 --gpu 0 \
   --lambda-z 1e-3 --alpha-lr 0.5 --output runs/tiny-imagenet
 ```
 
 ## Language training
 
-Set `--gpu` to your CUDA device index. The language runner saves logs to `log/` and curves to `plot/`.
+Set `--gpu` to your CUDA device index. The language runner saves logs to `log/` and curves to `plot/`. The `--mm` parameter controls normalized server momentum. The MNLI and RTE coefficients below require full-run validation with this update.
 
 ### QNLI / RoBERTa-Base
 
 ```bash
 python src/language/new_llm_sam2.py \
-  --alg SAMFed --data_name qnli --CNN roberta_base --lr 1e-1 --epoch 101 \
+  --alg FedRSAM --data_name qnli --CNN roberta_base --lr 1e-1 --epoch 101 \
   --E 10 --K 50 --batch_size 32 --num_workers 20 --selection 0.2 \
-  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --gamma 0.0 --rho 0.1 \
+  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --mm 0.0 --rho 0.1 \
   --lambda_z 1.0 --z_lr 1e-3 --alpha_lr 0.5
 ```
 
@@ -129,9 +129,9 @@ python src/language/new_llm_sam2.py \
 
 ```bash
 python src/language/new_llm_sam2.py \
-  --alg SAMFed --data_name MNLI --CNN roberta_base --lr 1e-1 --epoch 101 \
+  --alg FedRSAM --data_name MNLI --CNN roberta_base --lr 1e-1 --epoch 101 \
   --E 10 --K 50 --batch_size 32 --num_workers 20 --selection 0.2 \
-  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --gamma 0.3 --rho 0.1 \
+  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --mm 0.3 --rho 0.1 \
   --lambda_z 1.0 --z_lr 1e-3 --alpha_lr 0.5
 ```
 
@@ -139,9 +139,9 @@ python src/language/new_llm_sam2.py \
 
 ```bash
 python src/language/new_llm_sam2.py \
-  --alg SAMFed --data_name RTE --CNN roberta_base --lr 1e-1 --epoch 101 \
+  --alg FedRSAM --data_name RTE --CNN roberta_base --lr 1e-1 --epoch 101 \
   --E 10 --K 50 --batch_size 32 --num_workers 20 --selection 0.2 \
-  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --gamma 0.2 --rho 0.1 \
+  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --mm 0.2 --rho 0.1 \
   --lambda_z 1.0 --z_lr 1e-2 --alpha_lr 0.5
 ```
 
@@ -149,8 +149,8 @@ python src/language/new_llm_sam2.py \
 
 ```bash
 python src/language/new_llm_sam2.py \
-  --alg SAMFed --data_name QQP --CNN roberta_base --lr 1e-1 --epoch 101 \
+  --alg FedRSAM --data_name QQP --CNN roberta_base --lr 1e-1 --epoch 101 \
   --E 10 --K 50 --batch_size 32 --num_workers 20 --selection 0.2 \
-  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --gamma 0.0 --rho 0.05 \
+  --alpha_value 0.1 --gpu 0 --num_gpus_per 0.25 --mm 0.0 --rho 0.05 \
   --lambda_z 0.3 --z_lr 1e-3 --alpha_lr 0.5
 ```

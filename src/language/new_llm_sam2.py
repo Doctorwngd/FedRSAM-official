@@ -12,7 +12,7 @@ parser.add_argument('--epoch', default=100, type=int, help='number of epochs to 
 parser.add_argument('--num_workers', default=100, type=int, help='#workers')
 parser.add_argument('--batch_size', default=16, type=int, help='# batch_size')
 parser.add_argument('--E', default=1, type=int, help='# batch_size')
-parser.add_argument('--alg', default='FedMoment', type=str, help='alg')
+parser.add_argument('--alg', default='FedRSAM', type=str, help='alg')
 parser.add_argument('--extname', default='EM', type=str, help='extra_name')
 parser.add_argument('--gpu', default='0,1', type=str, help='use which gpus')
 parser.add_argument('--lr_decay', default='0.99', type=float, help='lr_decay')
@@ -25,7 +25,8 @@ parser.add_argument('--check', default=0, type=int, help=' if check')
 parser.add_argument('--T_part', default=10, type=int, help=' for mom_step')
 parser.add_argument('--alpha', default=1, type=float, help=' for mom_step')
 parser.add_argument('--CNN', default='VIT-L', type=str, help=' for mom_step')
-parser.add_argument('--gamma', default=0.9, type=float, help=' for mom_step')
+parser.add_argument('--gamma', default=0.9, type=float, help='Momentum for baseline algorithms')
+parser.add_argument('--mm', default=0.0, type=float, help='Normalized FedRSAM server momentum coefficient')
 parser.add_argument('--weights', type=str, default='./swin_tiny_patch4_window7_224.pth',
                     help='initial weights path')
 parser.add_argument('--p', default=1, type=int, help=' for mom_step')
@@ -53,6 +54,10 @@ parser.add_argument('--alpha_lr', default=0.5, type=float, help='learning rate f
 
 parser.set_defaults(alpha=0.9, lr_decay=2.0, lora=1, extname='RoBERTa_SST2', print=1)
 args = parser.parse_args()
+if args.alg in ('SAMFed', 'NSAMFed'):
+    args.alg = 'FedRSAM'
+if not 0.0 <= args.mm < 1.0:
+    parser.error('--mm must be in [0, 1)')
 print(args.lora)
 gpu_idx = args.gpu
 print('gpu_idx', gpu_idx)
@@ -1300,7 +1305,7 @@ class DataWorker(object):
             'FedAvg': self.update_fedavg,
             'FedSAM':self.update_SAM,
             'FedNSAM': self.update_NSAM,
-            'SAMFed': self.update_SAMFed,
+            'FedRSAM': self.update_SAMFed,
             'FedAvg_adamw': self.update_fedavg_adamw,
             'FedAvg_adamw_A': self.update_fedavg_adamw_A,
             'FedAvg_adamw_V': self.update_fedavg_adamw_V,
@@ -1330,7 +1335,7 @@ class DataWorker(object):
             return self.func_dict.get(alg, None)(weights, E, index, ps_c, lr)
         if alg in {'FedNSAM'}:
             return self.func_dict.get(alg, None)(weights, E, index, ps_c, lr)
-        if alg in {'SAMFed'}:
+        if alg in {'FedRSAM'}:
             return self.func_dict.get(alg, None)(weights, E, index, lr, constraint_space)
         else:
             return self.func_dict.get(alg, None)(weights, E, index, lr)
@@ -1397,7 +1402,8 @@ def apply_weights_adam(num_workers, weights,model,momen_m,momen_v):
     return model.state_dict(),momen_m,momen_v
 
 def apply_weights_avgACG(num_workers, weights, model, momen_v):
-    gamma = args.gamma
+    gamma = args.mm if args.alg == 'FedRSAM' else args.gamma
+    update_scale = 1.0 - gamma if args.alg == 'FedRSAM' else 1.0
     ps_w = {k: v.cpu() for k, v in model.state_dict().items()}
     sum_weights = {}
     scale = 1.0 / (num_workers * selection)
@@ -1415,7 +1421,7 @@ def apply_weights_avgACG(num_workers, weights, model, momen_v):
     for k, v in sum_weights.items():
         if k not in momen_v:
             momen_v[k] = torch.zeros_like(v)
-        momen_v[k] = gamma * momen_v[k] + v
+        momen_v[k] = gamma * momen_v[k] + update_scale * v
 
     seted_weight = {}
     for k, v in ps_w.items():
@@ -1642,6 +1648,8 @@ if __name__ == "__main__":
     E = args.E
     lr_decay = args.lr_decay
     alg = args.alg
+    momentum_name = "mm" if alg == "FedRSAM" else "gamma"
+    momentum_value = args.mm if alg == "FedRSAM" else args.gamma
     data_name = args.data_name
     selection = args.selection
     tau = args.tau
@@ -1670,7 +1678,7 @@ if __name__ == "__main__":
         'FedAvg',
         'FedSAM',
         'FedNSAM',
-        'SAMFed',
+        'FedRSAM',
         'FedCM',
         'FedAvg_adamw',
         'FedAdam',
@@ -1764,8 +1772,8 @@ if __name__ == "__main__":
                                  T_part=T_part) for i in range(int(num_workers * selection))]
 
 
-    logger.info('extra_name:{},alg:{},E:{},data_name:{}, epoch:{}, lr:{},alpha_value:{},alpha:{},CNN:{},gamma:{}'
-                .format(extra_name, alg, E, data_name, epoch, lr, alpha_value, alpha, args.CNN, args.gamma))
+    logger.info('extra_name:{},alg:{},E:{},data_name:{}, epoch:{}, lr:{},alpha_value:{},alpha:{},CNN:{},{}:{}'
+                .format(extra_name, alg, E, data_name, epoch, lr, alpha_value, alpha, args.CNN, momentum_name, momentum_value))
 
     test_loader = get_data_loader_test(data_name)
     train_loader = get_data_loader_train(data_name)
@@ -1876,7 +1884,7 @@ if __name__ == "__main__":
             current_weights = apply_weights_avg(num_workers, weights,model)
             time4 = time.time()
             model.load_state_dict(current_weights)
-        elif alg in {'SAMFed'}:
+        elif alg in {'FedRSAM'}:
             if not momen_m:
                 momen_m = {k: torch.zeros_like(v, device='cpu') for k, v in current_weights.items()}
 
@@ -2043,17 +2051,17 @@ if __name__ == "__main__":
             writer.add_scalar('accuracy', accuracy, epochidx * E)
             writer.add_scalar('loss median', loss_train_median, epochidx * E)
             logger.info(
-                "Iter {}: \t accuracy is {:.2f}, train loss is {:.5f}, test loss is {:.5f}, no improve:{}, name:{},lr:{:.7f},CNN:{},GPU:{},gamma:{},rho:{},alpha_value:{},data:{}".format(
+                "Iter {}: \t accuracy is {:.2f}, train loss is {:.5f}, test loss is {:.5f}, no improve:{}, name:{},lr:{:.7f},CNN:{},GPU:{},{}:{},rho:{},alpha_value:{},data:{}".format(
                     epochidx, accuracy,
                     loss_train_median, test_loss,
-                    no_improve, args.alg, lr, args.CNN, args.gpu, args.gamma, args.rho, args.alpha_value,
+                    no_improve, args.alg, lr, args.CNN, args.gpu, momentum_name, momentum_value, args.rho, args.alpha_value,
                     args.data_name))
 
             print(
-                "Iter {}: \t accuracy is {:.2f}, train loss is {:.5f}, test loss is {:.5f}, no improve:{}, name:{},lr:{:.7f},CNN:{},GPU:{},data:{},gamma:{},rho:{},alpha_value:{}".format(
+                "Iter {}: \t accuracy is {:.2f}, train loss is {:.5f}, test loss is {:.5f}, no improve:{}, name:{},lr:{:.7f},CNN:{},GPU:{},data:{},{}:{},rho:{},alpha_value:{}".format(
                     epochidx, accuracy,
                     loss_train_median, test_loss,
-                    no_improve, args.alg, lr, args.CNN, args.gpu, args.data_name, args.gamma,
+                    no_improve, args.alg, lr, args.CNN, args.gpu, args.data_name, momentum_name, momentum_value,
                     args.rho, args.alpha_value))
 
             if np.isnan(loss_train_median):
@@ -2071,10 +2079,10 @@ if __name__ == "__main__":
     result = np.array(result_list)
     result_loss = np.array(result_list_loss)
     test_list_loss = np.array(test_list_loss)
-    save_name = './plot/alg_{}-data_{}-E_{}-#wk_{}-ep_{}-lr_{}-alpha_value_{}-selec_{}-alpha{}-{}-gamma{}-rho{}-CNN{}-optimizer{}-time{}'.format(
+    save_name = './plot/alg_{}-data_{}-E_{}-#wk_{}-ep_{}-lr_{}-alpha_value_{}-selec_{}-alpha{}-{}-{}{}-rho{}-CNN{}-optimizer{}-time{}'.format(
         alg,args.data_name, E, num_workers, epoch,
         lr, alpha_value, selection, alpha,
-        extra_name, args.gamma, args.rho, args.CNN, args.optimizer, endtime)
+        extra_name, momentum_name, momentum_value, args.rho, args.CNN, args.optimizer, endtime)
     save_name = save_name + '.npy'
     np.save(save_name, (x, result, result_loss, test_list_loss))
     ray.shutdown()

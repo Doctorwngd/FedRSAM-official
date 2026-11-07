@@ -13,7 +13,7 @@ import time
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--alg', default='FedRSAM_CF', choices=['FedRSAM_CF', 'FedAvg', 'FedAvgM', 'SCAFFOLD', 'FedSAM', 'FedLESAM', 'FedGAMMA'])
+    p.add_argument('--alg', default='FedRSAM', choices=['FedRSAM', 'FedAvg', 'FedAvgM', 'SCAFFOLD', 'FedSAM', 'FedLESAM', 'FedGAMMA'])
     p.add_argument('--lambda-z', type=float, default=.001)
     p.add_argument('--alpha-lr', type=float, default=.5)
     p.add_argument('--gpu', required=True)
@@ -115,7 +115,7 @@ def main():
         clients=100, selection=.1, dirichlet_alpha=.01, local_epochs=1,
         max_steps=50, batch_size=16, lr=.1, lr_schedule='cosine over 101 rounds',
         rho=.1, rho_schedule='constant', weight_decay=.001, clip_norm=10,
-        server_momentum=.85 if a.alg in ('FedAvgM', 'FedRSAM_CF') else 0., seed=a.seed,
+        server_momentum=.85 if a.alg in ('FedAvgM', 'FedRSAM') else 0., seed=a.seed,
         regularizer_solver='closed_form', alpha_scope='global', cone_scope='global',
         alpha_init=.1, inner_steps=1, client_lookahead_gamma=0., first_round_rho=.1,
         aggregation='uniform selected-client mean', test='TinyImageNet labeled validation 10000',
@@ -172,7 +172,7 @@ def main():
                     x, y = x.cuda(non_blocking=True), y.cuda(non_blocking=True)
                     opt.zero_grad(set_to_none=True)
                     saved = None
-                    if a.alg == 'FedRSAM_CF' and cone_direction is not None:
+                    if a.alg == 'FedRSAM' and cone_direction is not None:
                         saved = vector().clone()
                         install(saved + .01 * cone_direction)
                         criterion(model(x), y).backward()
@@ -183,7 +183,7 @@ def main():
                         cf_steps += 1
                         install(saved + delta)
                         opt.zero_grad(set_to_none=True)
-                    elif a.alg in ('FedSAM', 'FedGAMMA', 'FedRSAM_CF'):
+                    elif a.alg in ('FedSAM', 'FedGAMMA', 'FedRSAM'):
                         criterion(model(x), y).backward()
                         grad = torch.cat([v.grad.detach().flatten() if v.grad is not None else torch.zeros_like(v).flatten() for v in params])
                         saved = vector().clone()
@@ -215,13 +215,13 @@ def main():
                 print(f'round={t} client={cid} steps={count} loss={losses[-1]:.6f}', flush=True)
             avg = torch.stack(updates).mean(0)
             previous_global = global_w.clone()
-            if a.alg in ('FedAvgM', 'FedRSAM_CF'):
+            if a.alg in ('FedAvgM', 'FedRSAM'):
                 momentum.mul_(.85).add_(avg)
                 global_w.add_(momentum)
             else:
                 global_w.add_(avg)
             c.add_(dc / 100)
-            if a.alg == 'FedRSAM_CF':
+            if a.alg == 'FedRSAM':
                 cone_direction, cone_variance = build_cone(global_w - previous_global, updates)
             install(global_w)
             torch.cuda.synchronize()
