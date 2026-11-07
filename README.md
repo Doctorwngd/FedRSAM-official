@@ -57,8 +57,7 @@ PY
 
 ## Vision training
 
-Set `--gpu` to your CUDA device index. The runners use the closed-form method and fixed server momentum 0.85. The commands save outputs under `runs/`.
-
+Set `--gpu` to your CUDA device index. 
 ### CIFAR-10 / LeNet-5
 
 ```bash
