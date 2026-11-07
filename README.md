@@ -113,7 +113,7 @@ python src/tiny/runner.py \
 
 ## Language training
 
-Set `--gpu` to your CUDA device index. The language runner saves logs to `log/` and curves to `plot/`. The `--mm` parameter controls normalized server momentum. The MNLI and RTE coefficients below require full-run validation with this update.
+Set `--gpu` to your CUDA device index. The language runner saves logs to `log/` and curves to `plot/`. The `--mm` parameter controls normalized server momentum.
 
 ### QNLI / RoBERTa-Base
 
